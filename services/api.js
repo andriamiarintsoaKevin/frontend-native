@@ -1,7 +1,7 @@
 import { create } from "axios";
 import { storage } from "./storage";
 
-const API_URL = "http://localhost:8000";
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
 
 const api = create({
   baseURL: API_URL,

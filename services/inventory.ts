@@ -1,5 +1,5 @@
+import { Category, Product } from "../types";
 import api from "./api";
-import { Product, Category } from "../types";
 
 const productsPrefix = "/v1/products";
 const categoriesPrefix = "/v1/categories";
@@ -17,11 +17,16 @@ export const inventoryService = {
     const response = await api.get(`${productsPrefix}/${id}`);
     return response.data;
   },
-  createProduct: async (product: Omit<Product, "id" | "category">): Promise<Product> => {
+  createProduct: async (
+    product: Omit<Product, "id" | "category" | "created_at">,
+  ): Promise<Product> => {
     const response = await api.post(`${productsPrefix}/`, product);
     return response.data;
   },
-  updateProduct: async (id: number, product: Partial<Product>): Promise<Product> => {
+  updateProduct: async (
+    id: number,
+    product: Partial<Product>,
+  ): Promise<Product> => {
     const response = await api.put(`${productsPrefix}/${id}`, product);
     return response.data;
   },

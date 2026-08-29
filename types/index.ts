@@ -7,9 +7,27 @@ export interface Product {
   id: number;
   name: string;
   description?: string | null;
-  unit_price: number;
-  stock_quantity: number;
+  price: number;
+  quantity: number;
   category_id: number;
   created_at?: string;
   category?: Category;
+}
+
+export type MovementType = "IN" | "OUT";
+
+export interface StockMovement {
+  id: number;
+  product_id: number;
+  quantity: number;
+  movement_type: MovementType;
+  reason?: string | null;
+  created_at: string;
+}
+
+export interface StockMovementCreate {
+  product_id: number;
+  quantity: number;
+  movement_type: MovementType;
+  reason?: string | null;
 }
