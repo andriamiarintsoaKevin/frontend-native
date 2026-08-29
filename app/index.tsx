@@ -42,7 +42,7 @@ export default function Index() {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace("/dashboard" as any);
+      router.replace("/(protected)/dashboard");
     }
   }, [isAuthenticated, router]);
 
@@ -51,7 +51,7 @@ export default function Index() {
     const ok = await login(email.trim(), password);
 
     if (ok) {
-      router.replace("/dashboard" as any);
+      router.replace("/(protected)/dashboard");
     }
   };
 

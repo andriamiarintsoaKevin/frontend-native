@@ -22,10 +22,10 @@ function RootLayoutNav() {
     const inAuthGroup = segments[0] === "(protected)";
 
     // 3. Gestion de la redirection automatique
-    if (!isAuthenticated && !inAuthGroup) {
+    if (!isAuthenticated && inAuthGroup) {
       router.replace("/");
-    } else if (isAuthenticated && inAuthGroup) {
-      router.replace("/dashboard");
+    } else if (isAuthenticated && !inAuthGroup) {
+      router.replace("/(protected)/dashboard");
     }
 
     // 4. Masque le Splash Screen une fois que tout est prêt et redirigé
