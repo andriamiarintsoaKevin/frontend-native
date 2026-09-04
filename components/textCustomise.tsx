@@ -1,10 +1,10 @@
 import { useTheme } from "@/components/themeProvider";
-import { StyleSheet, Text, TextStyle, View } from "react-native";
+import { StyleProp, StyleSheet, Text, TextStyle, View } from "react-native";
 
 type TextCustomiseProps = {
   typeText: "h1" | "paragraph" | "txtBack" | "txtMedium" | "normal" | "default";
   children: React.ReactNode;
-  style?: TextStyle;
+  style?: StyleProp<TextStyle>;
 };
 
 const TextCustomise: React.FC<TextCustomiseProps> = ({
