@@ -11,6 +11,7 @@ import {
     Text,
     View,
 } from "react-native";
+import ErrorNotice from "../errorNotice";
 import TouristFormModal from "./TouristFormModal";
 import TouristRow from "./TouristRow";
 import { Tourist } from "./types";
@@ -79,19 +80,10 @@ const Touriste = () => {
       </View>
 
       {errorMessage && (
-        <View style={[styles.errorBox, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.errorText, { color: colors.text }]}>
-            {errorMessage}
-          </Text>
-          <Pressable
-            onPress={() => setErrorMessage(null)}
-            accessibilityLabel="Fermer le message"
-          >
-            <Text style={[styles.closeError, { color: colors.textMuted }]}>
-              X
-            </Text>
-          </Pressable>
-        </View>
+        <ErrorNotice
+          message={errorMessage}
+          onDismiss={() => setErrorMessage(null)}
+        />
       )}
 
       {isLoading ? (
@@ -164,16 +156,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: { fontSize: 15, fontWeight: "600" },
-  errorBox: {
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  errorText: { flex: 1, fontSize: 14, marginRight: 10 },
-  closeError: { fontSize: 18, fontWeight: "700", padding: 4 },
   loader: { marginTop: 40 },
   list: { paddingBottom: 24, gap: 10 },
   emptyList: { flexGrow: 1, justifyContent: "center" },

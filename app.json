@@ -23,6 +23,12 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Autoriser OmniStock à utiliser la caméra pour scanner les codes-barres"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/logo.svg",
@@ -42,6 +48,3 @@
     }
   }
 }
-
-
-

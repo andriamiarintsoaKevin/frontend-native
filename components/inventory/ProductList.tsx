@@ -1,17 +1,17 @@
-import React, { useState } from "react";
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
+import {
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 
+import { Category, Product } from "../../types";
 import { stitchColors, useTheme } from "../themeProvider";
-import { Category, Product, SectorType } from "../../types";
 
 interface ProductListProps {
   products: Product[];
@@ -67,8 +67,8 @@ export default function ProductList({
     const notchColor = isMedical
       ? stitchColors.tertiary
       : isIT
-      ? stitchColors.secondary
-      : stitchColors.primary;
+        ? stitchColors.secondary
+        : stitchColors.primary;
 
     return (
       <Pressable
@@ -88,8 +88,8 @@ export default function ProductList({
                   backgroundColor: isMedical
                     ? "rgba(16,185,129,0.12)"
                     : isIT
-                    ? "rgba(139,92,246,0.12)"
-                    : "rgba(6,182,212,0.12)",
+                      ? "rgba(139,92,246,0.12)"
+                      : "rgba(6,182,212,0.12)",
                 },
               ]}
             >
@@ -109,8 +109,8 @@ export default function ProductList({
                   {item.batch_number
                     ? `Lot #${item.batch_number}`
                     : item.serial_number
-                    ? `S/N: ${item.serial_number}`
-                    : `SKU: ${item.sku || "REF-" + item.id}`}
+                      ? `S/N: ${item.serial_number}`
+                      : `SKU: ${item.sku || "REF-" + item.id}`}
                 </Text>
               </View>
             </View>
@@ -118,19 +118,64 @@ export default function ProductList({
 
           {/* Status Badge */}
           {item.is_expired ? (
-            <View style={[styles.statusPill, { backgroundColor: "rgba(239,68,68,0.15)" }]}>
-              <View style={[styles.statusDot, { backgroundColor: stitchColors.error }]} />
-              <Text style={[styles.statusPillText, { color: stitchColors.error }]}>Périmé</Text>
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: "rgba(239,68,68,0.15)" },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: stitchColors.error },
+                ]}
+              />
+              <Text
+                style={[styles.statusPillText, { color: stitchColors.error }]}
+              >
+                Périmé
+              </Text>
             </View>
           ) : isLowStock ? (
-            <View style={[styles.statusPill, { backgroundColor: "rgba(245,158,11,0.15)" }]}>
-              <View style={[styles.statusDot, { backgroundColor: stitchColors.warning }]} />
-              <Text style={[styles.statusPillText, { color: stitchColors.warning }]}>Stock Faible</Text>
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: "rgba(245,158,11,0.15)" },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: stitchColors.warning },
+                ]}
+              />
+              <Text
+                style={[styles.statusPillText, { color: stitchColors.warning }]}
+              >
+                Stock Faible
+              </Text>
             </View>
           ) : (
-            <View style={[styles.statusPill, { backgroundColor: "rgba(16,185,129,0.12)" }]}>
-              <View style={[styles.statusDot, { backgroundColor: stitchColors.tertiary }]} />
-              <Text style={[styles.statusPillText, { color: stitchColors.tertiary }]}>En Stock</Text>
+            <View
+              style={[
+                styles.statusPill,
+                { backgroundColor: "rgba(16,185,129,0.12)" },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: stitchColors.tertiary },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.statusPillText,
+                  { color: stitchColors.tertiary },
+                ]}
+              >
+                En Stock
+              </Text>
             </View>
           )}
         </View>
@@ -138,9 +183,13 @@ export default function ProductList({
         {/* Telemetry Row */}
         <View style={styles.telemetryBox}>
           <View style={styles.telemetryColLeft}>
-            <Ionicons name="location-outline" size={14} color={stitchColors.tertiary} />
+            <Ionicons
+              name="location-outline"
+              size={14}
+              color={stitchColors.tertiary}
+            />
             <Text style={styles.telemetryText} numberOfLines={1}>
-              {item.warehouse_location || "Allée 4B - Frigo #02"}
+              {item.warehouse_location || "Emplacement non renseigné"}
             </Text>
           </View>
 
@@ -150,10 +199,16 @@ export default function ProductList({
               size={14}
               color={stitchColors.primary}
             />
-            <Text style={[styles.telemetryText, { color: stitchColors.primary }]} numberOfLines={1}>
+            <Text
+              style={[styles.telemetryText, { color: stitchColors.primary }]}
+              numberOfLines={1}
+            >
               {isMedical
-                ? `Temp ${item.storage_temperature ?? 4.1}°C`
-                : item.hardware_condition || "Actif"}
+                ? item.storage_temperature !== null &&
+                  item.storage_temperature !== undefined
+                  ? `Temp ${item.storage_temperature}°C`
+                  : "Température non renseignée"
+                : item.hardware_condition || "État non renseigné"}
             </Text>
           </View>
         </View>
@@ -168,9 +223,15 @@ export default function ProductList({
           <View style={styles.quickActionsRow}>
             <Pressable
               style={styles.logsButton}
-              onPress={() => router.push(`/(protected)/inventory/${item.id}` as any)}
+              onPress={() =>
+                router.push(`/(protected)/inventory/${item.id}` as any)
+              }
             >
-              <Ionicons name="time-outline" size={14} color={stitchColors.text} />
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={stitchColors.text}
+              />
               <Text style={styles.logsButtonText}>Détails</Text>
             </Pressable>
 
@@ -190,7 +251,12 @@ export default function ProductList({
     <View style={styles.container}>
       {/* 1. Search + Barcode Trigger */}
       <View style={styles.searchBarContainer}>
-        <Ionicons name="search" size={18} color={stitchColors.textMuted} style={{ marginRight: 8 }} />
+        <Ionicons
+          name="search"
+          size={18}
+          color={stitchColors.textMuted}
+          style={{ marginRight: 8 }}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Rechercher un produit, lot, série..."
@@ -214,9 +280,17 @@ export default function ProductList({
           contentContainerStyle={styles.filterPillsRow}
           data={[
             { key: "all", label: "Tous" },
-            { key: "medical", label: "Vaccins & Injectables", count: 84 },
-            { key: "low_stock", label: "Stock Faible", colorDot: stitchColors.warning },
-            { key: "expired", label: "Périmés / Urgents", colorDot: stitchColors.error },
+            { key: "medical", label: "Médical / Pharma" },
+            {
+              key: "low_stock",
+              label: "Stock Faible",
+              colorDot: stitchColors.warning,
+            },
+            {
+              key: "expired",
+              label: "Périmés / Urgents",
+              colorDot: stitchColors.error,
+            },
             { key: "it", label: "Laptops & Serveurs IT" },
           ]}
           keyExtractor={(item) => item.key}
@@ -231,7 +305,12 @@ export default function ProductList({
                 onPress={() => setActiveFilter(item.key as FilterType)}
               >
                 {item.colorDot && (
-                  <View style={[styles.filterDot, { backgroundColor: item.colorDot }]} />
+                  <View
+                    style={[
+                      styles.filterDot,
+                      { backgroundColor: item.colorDot },
+                    ]}
+                  />
                 )}
                 <Text
                   style={[
@@ -263,7 +342,11 @@ export default function ProductList({
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="file-tray-outline" size={48} color={stitchColors.border} />
+            <Ionicons
+              name="file-tray-outline"
+              size={48}
+              color={stitchColors.border}
+            />
             <Text style={styles.emptyText}>Aucun article trouvé</Text>
           </View>
         }

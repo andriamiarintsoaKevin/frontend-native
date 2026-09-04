@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { useColorScheme } from "react-native";
 
 export type ThemeMode = "light" | "dark";
 
@@ -47,7 +46,7 @@ export const themeColors = {
     stitchDarkBg: stitchColors.bgDark,
   },
   dark: {
-    background: "#0F131C",
+    background: stitchColors.bgDark,
     surface: "#131B2A",
     surfaceMuted: "#1C2028",
     primary: "#06B6D4",
@@ -81,10 +80,7 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemTheme = useColorScheme();
-  const [theme, setThemeState] = useState<ThemeMode>(
-    systemTheme === "dark" ? "dark" : "light",
-  );
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
 
   const value = useMemo(
     () => ({

@@ -39,12 +39,12 @@ export interface DashboardMetrics {
   critical_stock_count: number;
   expiring_soon_count: number;
   expired_count: number;
-  turnover_rate: number;
+  turnover_rate: number | null;
   cold_chain: {
     status: string;
-    current_temp: number;
-    target_range: string;
-    hub: string;
+    current_temp: number | null;
+    target_range: string | null;
+    hub: string | null;
   };
 }
 

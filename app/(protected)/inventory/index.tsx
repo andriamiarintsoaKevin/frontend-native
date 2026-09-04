@@ -1,4 +1,6 @@
-import React, { useCallback, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -7,18 +9,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
 
-import { stitchColors, useTheme } from "@/components/themeProvider";
 import ProductList from "@/components/inventory/ProductList";
+import { useTheme } from "@/components/themeProvider";
 import { inventoryService } from "@/services/inventory";
 import { Category, Product } from "@/types";
 
 export default function InventoryScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,37 +56,42 @@ export default function InventoryScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: stitchColors.bgDark }]}
+      style={[styles.container, { backgroundColor: colors.background }]}
       edges={["top"]}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            borderBottomColor: colors.border,
+            backgroundColor: colors.background,
+          },
+        ]}
+      >
         <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => router.back()}
-            style={styles.backButton}
-            hitSlop={8}
-          >
-            <Ionicons name="chevron-back" size={22} color={stitchColors.text} />
-          </Pressable>
           <View>
-            <Text style={styles.headerTitle}>INVENTAIRE & FILTRES</Text>
-            <Text style={styles.headerSubtitle}>SITE PRINCIPAL • ZONE A & B</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              INVENTAIRE & FILTRES
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+              Produits enregistrés en base
+            </Text>
           </View>
         </View>
 
         <View style={styles.headerActions}>
           <Pressable
             onPress={() => router.push("/(protected)/scanner" as any)}
-            style={styles.actionBtn}
+            style={[styles.actionBtn, { backgroundColor: colors.surface }]}
           >
-            <Ionicons name="scan-outline" size={18} color={stitchColors.primary} />
+            <Ionicons name="scan-outline" size={18} color={colors.primary} />
           </Pressable>
           <Pressable
             onPress={() => router.push("/(protected)/inventory/create" as any)}
-            style={[styles.actionBtn, { backgroundColor: stitchColors.primary }]}
+            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
           >
-            <Ionicons name="add" size={20} color="#0B0F17" />
+            <Ionicons name="add" size={20} color={colors.onPrimary} />
           </Pressable>
         </View>
       </View>
@@ -96,7 +100,7 @@ export default function InventoryScreen() {
         {loading && !refreshing ? (
           <ActivityIndicator
             size="large"
-            color={stitchColors.primary}
+            color={colors.primary}
             style={{ marginTop: 40 }}
           />
         ) : (
@@ -123,8 +127,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: stitchColors.border,
-    backgroundColor: "rgba(11,15,23,0.95)",
   },
   headerLeft: {
     flexDirection: "row",
@@ -135,20 +137,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: stitchColors.card,
     alignItems: "center",
     justifyContent: "center",
   },
   headerTitle: {
     fontSize: 14,
     fontWeight: "900",
-    color: stitchColors.text,
     letterSpacing: 0.5,
   },
   headerSubtitle: {
     fontSize: 10,
     fontWeight: "700",
-    color: stitchColors.textMuted,
     letterSpacing: 1,
   },
   headerActions: {
@@ -160,7 +159,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: stitchColors.card,
     alignItems: "center",
     justifyContent: "center",
   },

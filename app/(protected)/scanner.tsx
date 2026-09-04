@@ -1,10 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Easing,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -14,16 +19,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
 
 import { stitchColors, useTheme } from "@/components/themeProvider";
 import { useAuth } from "@/contexts/AuthContext";
-import { movementService } from "@/services/movements";
 import { inventoryService } from "@/services/inventory";
-
-const { width } = Dimensions.get("window");
+import { movementService } from "@/services/movements";
+import { Product } from "@/types";
 
 export default function ScannerScreen() {
   const router = useRouter();
@@ -31,16 +32,41 @@ export default function ScannerScreen() {
   const { user } = useAuth();
 
   // État local
-  const [selectedSector, setSelectedSector] = useState<"pharma" | "it">("pharma");
-  const [quantity, setQuantity] = useState<number>(10);
-  const [reason, setReason] = useState<string>("Transfert Interne (Allée 4B → Bloc Opératoire)");
+  const [selectedSector, setSelectedSector] = useState<"pharma" | "it">(
+    "pharma",
+  );
+  const [quantity, setQuantity] = useState<number>(1);
+  const [reason, setReason] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [torchActive, setTorchActive] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [scannedCode, setScannedCode] = useState<string | null>(null);
+  const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
+
+  const resetScannerForm = useCallback(() => {
+    setSelectedSector("pharma");
+    setQuantity(1);
+    setReason("");
+    setNote("");
+    setTorchActive(false);
+    setSubmitting(false);
+    setToastMessage(null);
+    setScannedCode(null);
+    setScannedProduct(null);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetScannerForm();
+      };
+    }, [resetScannerForm]),
+  );
 
   // Animation du laser de scan
-  const laserAnim = useRef(new Animated.Value(0)).current;
+  const [laserAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.loop(
@@ -65,48 +91,57 @@ export default function ScannerScreen() {
     setQuantity((prev) => Math.max(1, prev + delta));
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (_) {}
+    } catch {}
   };
 
   const handleSetDirectQuantity = (step: number) => {
     setQuantity((prev) => prev + step);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (_) {}
+    } catch {}
+  };
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (scannedCode === data) return;
+    setScannedCode(data);
+    inventoryService
+      .scanProduct(data)
+      .then((product) => {
+        setScannedProduct(product);
+        setSelectedSector(product.sector === "it" ? "it" : "pharma");
+        setToastMessage(`Produit trouvé : ${product.name}`);
+      })
+      .catch(() => {
+        setScannedProduct(null);
+        setToastMessage("Aucun produit correspondant dans la base.");
+      });
+    setTimeout(() => setToastMessage(null), 2200);
   };
 
   const handleConfirmMovement = async () => {
-    if (submitting) return;
+    if (submitting || !scannedProduct) return;
     setSubmitting(true);
     try {
-      // Tenter de récupérer ou de créer le mouvement
-      // ID produit 1 (Insuline) par défaut pour la démo interactive du scanner Stitch
       await movementService.createMovement({
-        product_id: 1,
+        product_id: scannedProduct.id,
         quantity: quantity,
         movement_type: "OUT",
-        reason: `${reason}${note ? " - " + note : ""}`,
+        reason: [reason, note.trim()].filter(Boolean).join(" - ") || null,
       });
 
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (_) {}
+      } catch {}
 
-      setToastMessage(
-        `Mouvement Validé ! ${quantity} unités transférées.`
-      );
+      setToastMessage(`Mouvement Validé ! ${quantity} unités transférées.`);
 
       setTimeout(() => {
         setToastMessage(null);
         router.replace("/(protected)/dashboard");
       }, 1800);
-    } catch (error: any) {
-      // Si le produit n'existe pas encore en base, simuler la validation locale pour l'UX
-      setToastMessage(`Mouvement Validé localement (${quantity} unités).`);
-      setTimeout(() => {
-        setToastMessage(null);
-        router.replace("/(protected)/dashboard");
-      }, 1600);
+    } catch {
+      setToastMessage("Impossible d'enregistrer le mouvement.");
+      setTimeout(() => setToastMessage(null), 2200);
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +153,9 @@ export default function ScannerScreen() {
   });
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: stitchColors.bgDark }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Pressable
@@ -131,7 +168,11 @@ export default function ScannerScreen() {
 
         <View style={styles.headerBrand}>
           <View style={styles.logoBadge}>
-            <Ionicons name="scan-outline" size={18} color={stitchColors.primary} />
+            <Ionicons
+              name="scan-outline"
+              size={18}
+              color={stitchColors.primary}
+            />
           </View>
           <View>
             <Text style={styles.brandTitle}>OMNISTOCK</Text>
@@ -149,6 +190,14 @@ export default function ScannerScreen() {
             color={torchActive ? stitchColors.primary : stitchColors.textMuted}
           />
         </Pressable>
+        <Pressable
+          onPress={resetScannerForm}
+          style={styles.resetButton}
+          hitSlop={8}
+          accessibilityLabel="Réinitialiser le scanner"
+        >
+          <Ionicons name="refresh-outline" size={20} color={colors.textMuted} />
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView
@@ -162,6 +211,53 @@ export default function ScannerScreen() {
           {/* Top HUD Camera Viewfinder */}
           <View style={styles.viewfinderCard}>
             <View style={styles.viewfinderBackground}>
+              {permission?.granted ? (
+                <CameraView
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  enableTorch={torchActive}
+                  onBarcodeScanned={
+                    scannedCode ? undefined : handleBarcodeScanned
+                  }
+                  barcodeScannerSettings={{
+                    barcodeTypes: [
+                      "qr",
+                      "ean13",
+                      "ean8",
+                      "code128",
+                      "datamatrix",
+                    ],
+                  }}
+                />
+              ) : (
+                <View style={styles.cameraPermissionPanel}>
+                  <Ionicons
+                    name="camera-outline"
+                    size={30}
+                    color={stitchColors.primary}
+                  />
+                  <Text style={styles.cameraPermissionText}>
+                    {permission?.canAskAgain === false
+                      ? "L’accès caméra est bloqué dans les réglages du téléphone."
+                      : "Autorisez la caméra pour scanner un code."}
+                  </Text>
+                  <Pressable
+                    style={styles.permissionButton}
+                    onPress={() =>
+                      permission?.canAskAgain === false
+                        ? Linking.openSettings()
+                        : requestPermission()
+                    }
+                  >
+                    <Text style={styles.permissionButtonText}>
+                      {permission?.canAskAgain === false
+                        ? "Ouvrir les réglages"
+                        : "Autoriser la caméra"}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
+              <View pointerEvents="none" style={styles.cameraOverlay} />
               {/* Scan Reticle / Corners Calipers */}
               <View style={styles.reticleContainer}>
                 {/* 4 Corners */}
@@ -187,14 +283,24 @@ export default function ScannerScreen() {
               </View>
 
               <Text style={styles.reticleInstruction}>
-                ALIGNEZ LE CODE 1D/2D OU DATAMATRIX
+                {permission?.granted
+                  ? "ALIGNEZ LE CODE 1D/2D OU DATAMATRIX"
+                  : "CAMÉRA EN ATTENTE D’AUTORISATION"}
               </Text>
             </View>
 
             {/* Detected Code Floating Card (Direct Link to Product Detail) */}
             <Pressable
-              style={styles.detectedCodePill}
-              onPress={() => router.push("/(protected)/inventory/1" as any)}
+              style={[
+                styles.detectedCodePill,
+                scannedProduct && styles.readOnlyPanel,
+              ]}
+              onPress={() =>
+                scannedProduct &&
+                router.push(
+                  `/(protected)/inventory/${scannedProduct.id}` as any,
+                )
+              }
             >
               <View style={styles.detectedIconContainer}>
                 <Ionicons
@@ -204,9 +310,13 @@ export default function ScannerScreen() {
                 />
               </View>
               <View style={styles.detectedInfo}>
-                <Text style={styles.detectedTag}>CODE DÉTECTÉ • LOT 48B</Text>
+                <Text style={styles.detectedTag}>
+                  {scannedProduct ? "PRODUIT DÉTECTÉ" : "EN ATTENTE D’UN CODE"}
+                </Text>
                 <Text style={styles.detectedTitle} numberOfLines={1}>
-                  MED-99201-INS (Insuline Rapide 100UI)
+                  {scannedProduct?.name ||
+                    scannedCode ||
+                    "Scannez un code produit"}
                 </Text>
               </View>
               <Ionicons
@@ -220,7 +330,9 @@ export default function ScannerScreen() {
           {/* Sector Selector */}
           <View style={styles.sectorSection}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionHeading}>SECTEUR D'AFFECTATION</Text>
+              <Text style={styles.sectionHeading}>
+                SECTEUR D&apos;AFFECTATION
+              </Text>
               <Text style={styles.protocolBadge}>Protocole ISO-13485</Text>
             </View>
 
@@ -229,17 +341,25 @@ export default function ScannerScreen() {
                 style={[
                   styles.sectorButton,
                   selectedSector === "pharma" && styles.sectorButtonActive,
+                  scannedProduct && styles.readOnlyControl,
                 ]}
                 onPress={() => setSelectedSector("pharma")}
+                disabled={Boolean(scannedProduct)}
               >
                 <MaterialCommunityIcons
                   name="medical-bag"
                   size={22}
-                  color={selectedSector === "pharma" ? stitchColors.primary : stitchColors.textMuted}
+                  color={
+                    selectedSector === "pharma"
+                      ? stitchColors.primary
+                      : stitchColors.textMuted
+                  }
                 />
                 <View style={styles.sectorButtonTextCol}>
                   <Text style={styles.sectorButtonTitle}>Médical & Pharma</Text>
-                  <Text style={styles.sectorButtonDesc}>Chaîne du froid active</Text>
+                  <Text style={styles.sectorButtonDesc}>
+                    Chaîne du froid active
+                  </Text>
                 </View>
               </Pressable>
 
@@ -247,17 +367,27 @@ export default function ScannerScreen() {
                 style={[
                   styles.sectorButton,
                   selectedSector === "it" && styles.sectorButtonActive,
+                  scannedProduct && styles.readOnlyControl,
                 ]}
                 onPress={() => setSelectedSector("it")}
+                disabled={Boolean(scannedProduct)}
               >
                 <MaterialCommunityIcons
                   name="laptop"
                   size={22}
-                  color={selectedSector === "it" ? stitchColors.secondary : stitchColors.textMuted}
+                  color={
+                    selectedSector === "it"
+                      ? stitchColors.secondary
+                      : stitchColors.textMuted
+                  }
                 />
                 <View style={styles.sectorButtonTextCol}>
-                  <Text style={styles.sectorButtonTitle}>Matériel IT & Data</Text>
-                  <Text style={styles.sectorButtonDesc}>Actifs serveurs / Baies</Text>
+                  <Text style={styles.sectorButtonTitle}>
+                    Matériel IT & Data
+                  </Text>
+                  <Text style={styles.sectorButtonDesc}>
+                    Actifs serveurs / Baies
+                  </Text>
                 </View>
               </Pressable>
             </View>
@@ -269,7 +399,14 @@ export default function ScannerScreen() {
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.fieldLabel}>QUANTITÉ DÉPLACÉE</Text>
-                <Text style={styles.stockAvailableText}>Stock Dispo : 148 flacons</Text>
+                <Text
+                  style={[
+                    styles.stockAvailableText,
+                    scannedProduct && styles.readOnlyText,
+                  ]}
+                >
+                  Stock Dispo : {scannedProduct?.quantity ?? "--"} unités
+                </Text>
               </View>
 
               <View style={styles.stepperContainer}>
@@ -283,9 +420,11 @@ export default function ScannerScreen() {
                 <View style={styles.stepperValueContainer}>
                   <View style={styles.stepperValueRow}>
                     <Text style={styles.stepperValueText}>{quantity}</Text>
-                    <Text style={styles.stepperUnitText}>flacons</Text>
+                    <Text style={styles.stepperUnitText}>unités</Text>
                   </View>
-                  <Text style={styles.stepperSubtext}>≈ {Math.ceil(quantity / 5)} boîtes de 5u</Text>
+                  <Text style={styles.stepperSubtext}>
+                    ≈ {Math.ceil(quantity / 5)} boîtes de 5u
+                  </Text>
                 </View>
 
                 <Pressable
@@ -313,16 +452,38 @@ export default function ScannerScreen() {
             {/* Movement Reason */}
             <View style={styles.formGroup}>
               <Text style={styles.fieldLabel}>MOTIF DU TRANSFERT</Text>
-              <View style={styles.pickerBox}>
+              <View
+                style={[
+                  styles.pickerBox,
+                  {
+                    backgroundColor: colors.inputBg,
+                    borderColor: colors.inputBorder,
+                  },
+                ]}
+              >
                 <Ionicons
                   name="swap-horizontal-outline"
                   size={18}
-                  color={stitchColors.primary}
+                  color={colors.primary}
                   style={{ marginRight: 10 }}
                 />
-                <Text style={styles.pickerText} numberOfLines={1}>
-                  {reason}
-                </Text>
+                <Picker
+                  selectedValue={reason}
+                  onValueChange={(value) => setReason(value)}
+                  style={[styles.reasonPicker, { color: colors.text, height: 100 }]}
+                  dropdownIconColor={colors.textMuted}
+                >
+                  <Picker.Item label="Choisir un motif" value="" />
+                  <Picker.Item
+                    label="Transfert entre sites"
+                    value="Transfert entre sites"
+                  />
+                  <Picker.Item
+                    label="Mise à disposition"
+                    value="Mise à disposition"
+                  />
+                  <Picker.Item label="Autre" value="Autre" />
+                </Picker>
               </View>
             </View>
 
@@ -330,18 +491,28 @@ export default function ScannerScreen() {
             <View style={styles.operatorTile}>
               <View style={styles.operatorLeft}>
                 <View style={styles.operatorIcon}>
-                  <Ionicons name="person" size={18} color={stitchColors.primary} />
+                  <Ionicons
+                    name="person"
+                    size={18}
+                    color={stitchColors.primary}
+                  />
                 </View>
                 <View>
                   <Text style={styles.operatorRole}>AGENT RESPONSABLE</Text>
                   <Text style={styles.operatorName}>
-                    {user?.first_name ? `${user.first_name} ${user.last_name || ""}` : "Dr. Dupont • Logistique #42"}
+                    {user?.first_name
+                      ? `${user.first_name} ${user.last_name || ""}`.trim()
+                      : user?.name || user?.email || "Session non identifiée"}
                   </Text>
                 </View>
               </View>
-              <View style={styles.validatedBadge}>
-                <Ionicons name="lock-open-outline" size={14} color={stitchColors.tertiary} />
-                <Text style={styles.validatedText}>VALIDÉ</Text>
+              <View style={styles.sessionBadge}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={14}
+                  color={stitchColors.tertiary}
+                />
+                <Text style={styles.validatedText}>SESSION ACTIVE</Text>
               </View>
             </View>
 
@@ -374,13 +545,15 @@ export default function ScannerScreen() {
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={22} color="#0B0F17" />
-                <Text style={styles.confirmButtonText}>Confirmer le Mouvement</Text>
+                <Text style={styles.confirmButtonText}>
+                  Confirmer le Mouvement
+                </Text>
               </>
             )}
           </Pressable>
 
           <Text style={styles.syncFooterNotice}>
-            Synchronisation automatique OmniStock Mesh Cloud
+            Mouvement enregistré dans la base via FastAPI
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -455,6 +628,14 @@ const styles = StyleSheet.create({
     borderColor: stitchColors.primary,
     borderWidth: 1,
   },
+  resetButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: stitchColors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
@@ -477,6 +658,34 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+  },
+  cameraOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(8,12,20,0.2)",
+  },
+  cameraPermissionPanel: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  cameraPermissionText: {
+    color: stitchColors.text,
+    fontSize: 13,
+    textAlign: "center",
+  },
+  permissionButton: {
+    backgroundColor: stitchColors.primary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    marginTop: 4,
+  },
+  permissionButtonText: {
+    color: stitchColors.bgDark,
+    fontSize: 12,
+    fontWeight: "700",
   },
   reticleContainer: {
     width: 220,
@@ -544,6 +753,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: stitchColors.border,
   },
+  readOnlyPanel: {
+    backgroundColor: stitchColors.surface,
+    opacity: 0.72,
+  },
   detectedIconContainer: {
     marginRight: 10,
   },
@@ -601,6 +814,11 @@ const styles = StyleSheet.create({
     borderColor: stitchColors.primary,
     backgroundColor: stitchColors.cardElevated,
   },
+  readOnlyControl: {
+    borderColor: stitchColors.border,
+    backgroundColor: stitchColors.surface,
+    opacity: 0.62,
+  },
   sectorButtonTextCol: {
     flex: 1,
   },
@@ -640,6 +858,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: stitchColors.tertiary,
     fontWeight: "600",
+  },
+  readOnlyText: {
+    color: stitchColors.textMuted,
   },
   stepperContainer: {
     flexDirection: "row",
@@ -718,6 +939,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flex: 1,
   },
+  reasonPicker: {
+    flex: 1,
+    height: 46,
+    marginLeft: -8,
+  },
   operatorTile: {
     flexDirection: "row",
     alignItems: "center",
@@ -754,6 +980,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+  },
+  sessionBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: "rgba(16,185,129,0.12)",
   },
   validatedText: {
     fontSize: 11,

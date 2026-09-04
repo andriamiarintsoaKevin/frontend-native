@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,8 +12,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { stitchColors, useTheme } from "@/components/themeProvider";
 import { inventoryService } from "@/services/inventory";
@@ -38,23 +38,7 @@ export default function ProductDetailScreen() {
           setProduct(data);
         }
       } catch (error) {
-        // Fallback pour la démo / maquette interactive Stitch si id inexistant
-        setProduct({
-          id: 1,
-          name: "Flacons d'Insuline 10ml",
-          description: "Insulin Glargine 100 UI/ml • Réf: LLY-8472-EU",
-          price: 42.5,
-          quantity: 45,
-          category_id: 1,
-          sku: "PH-INS-10ML-R",
-          sector: "medical",
-          reorder_threshold: 50,
-          warehouse_location: "Allée 4B • Étagère 2 • Frigo 02",
-          batch_number: "MED-99201",
-          expiry_date: "2025-04-15",
-          storage_temperature: 4.1,
-          is_expired: false,
-        });
+        Alert.alert("Erreur", "Impossible de charger ce produit.");
       } finally {
         setLoading(false);
       }
@@ -63,55 +47,77 @@ export default function ProductDetailScreen() {
   }, [productId]);
 
   const triggerAction = async (type: "dispense" | "restock") => {
-    try {
-      if (type === "dispense") {
-        if (product && product.quantity > 0) {
-          try {
-            await movementService.createMovement({
-              product_id: product.id,
-              quantity: 1,
-              movement_type: "OUT",
-              reason: "Dispensation Urgences / Service Clinique",
-            });
-          } catch (_) {}
-          setProduct((prev) => (prev ? { ...prev, quantity: prev.quantity - 1 } : null));
-        }
-        setToastMessage("Dispensation validée : 1 unité décomptée");
-      } else {
-        try {
-          await movementService.createMovement({
-            product_id: product ? product.id : 1,
-            quantity: 10,
-            movement_type: "IN",
-            reason: "Réapprovisionnement central",
-          });
-        } catch (_) {}
-        setProduct((prev) => (prev ? { ...prev, quantity: prev.quantity + 10 } : null));
-        setToastMessage("Bon de commande réapprovisionnement généré (+10 U)");
-      }
+    if (!product || (type === "dispense" && product.quantity <= 0)) return;
 
-      setTimeout(() => {
-        setToastMessage(null);
-      }, 2500);
+    try {
+      await movementService.createMovement({
+        product_id: product.id,
+        quantity: type === "dispense" ? 1 : 10,
+        movement_type: type === "dispense" ? "OUT" : "IN",
+        reason: type === "dispense" ? "Dispensation" : "Réapprovisionnement",
+      });
+      setProduct((prev) =>
+        prev
+          ? {
+              ...prev,
+              quantity: prev.quantity + (type === "dispense" ? -1 : 10),
+            }
+          : null,
+      );
+      setToastMessage(
+        type === "dispense"
+          ? "Dispensation validée : 1 unité décomptée"
+          : "Entrée enregistrée : +10 unités",
+      );
+      setTimeout(() => setToastMessage(null), 2500);
     } catch (error) {
-      console.error(error);
+      Alert.alert("Erreur", "Impossible d'enregistrer le mouvement.");
     }
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: stitchColors.bgDark, justifyContent: "center", alignItems: "center" }]}>
+      <SafeAreaView
+        style={[
+          styles.container,
+          {
+            backgroundColor: stitchColors.bgDark,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
         <ActivityIndicator size="large" color={stitchColors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!product) {
+    return (
+      <SafeAreaView
+        style={[
+          styles.container,
+          {
+            backgroundColor: stitchColors.bgDark,
+            justifyContent: "center",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <Text style={{ color: stitchColors.text }}>Produit introuvable.</Text>
       </SafeAreaView>
     );
   }
 
   const isMedical = (product?.sector || "medical") === "medical";
   const isIT = product?.sector === "it";
-  const isLowStock = (product?.quantity ?? 0) <= (product?.reorder_threshold ?? 50);
+  const isLowStock =
+    (product?.quantity ?? 0) <= (product?.reorder_threshold ?? 50);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: stitchColors.bgDark }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: stitchColors.bgDark }]}
+    >
       {/* 1. Header */}
       <View style={styles.appBar}>
         <View style={styles.appBarLeft}>
@@ -123,7 +129,11 @@ export default function ProductDetailScreen() {
             <Ionicons name="chevron-back" size={22} color={stitchColors.text} />
           </Pressable>
           <View style={styles.brandIcon}>
-            <Ionicons name="cube-outline" size={16} color={stitchColors.primary} />
+            <Ionicons
+              name="cube-outline"
+              size={16}
+              color={stitchColors.primary}
+            />
           </View>
           <Text style={styles.screenTitle} numberOfLines={1}>
             Fiche Produit
@@ -132,10 +142,29 @@ export default function ProductDetailScreen() {
 
         <View style={styles.headerRight}>
           <Pressable
+            onPress={() =>
+              router.push(
+                `/(protected)/inventory/edit?productId=${product.id}` as any,
+              )
+            }
+            style={styles.scanShortcutBtn}
+            accessibilityLabel="Modifier le produit"
+          >
+            <Ionicons
+              name="create-outline"
+              size={18}
+              color={stitchColors.primary}
+            />
+          </Pressable>
+          <Pressable
             onPress={() => router.push("/(protected)/scanner" as any)}
             style={styles.scanShortcutBtn}
           >
-            <Ionicons name="scan-outline" size={18} color={stitchColors.primary} />
+            <Ionicons
+              name="scan-outline"
+              size={18}
+              color={stitchColors.primary}
+            />
           </Pressable>
         </View>
       </View>
@@ -154,8 +183,8 @@ export default function ProductDetailScreen() {
                   backgroundColor: isMedical
                     ? stitchColors.tertiary
                     : isIT
-                    ? stitchColors.secondary
-                    : stitchColors.primary,
+                      ? stitchColors.secondary
+                      : stitchColors.primary,
                 },
               ]}
             />
@@ -166,16 +195,16 @@ export default function ProductDetailScreen() {
                   color: isMedical
                     ? stitchColors.tertiary
                     : isIT
-                    ? stitchColors.secondary
-                    : stitchColors.primary,
+                      ? stitchColors.secondary
+                      : stitchColors.primary,
                 },
               ]}
             >
               {isMedical
                 ? "DÉPARTEMENT PHARMA & CLINIQUE"
                 : isIT
-                ? "DÉPARTEMENT MATÉRIEL IT"
-                : "LOGISTIQUE GÉNÉRALE"}
+                  ? "DÉPARTEMENT MATÉRIEL IT"
+                  : "LOGISTIQUE GÉNÉRALE"}
             </Text>
           </View>
 
@@ -190,13 +219,11 @@ export default function ProductDetailScreen() {
           <View style={styles.identityTopRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.skuText}>
-                SKU: {product?.sku || "PH-INS-10ML-R"}
+                SKU: {product.sku || "Non renseigné"}
               </Text>
-              <Text style={styles.productTitle}>
-                {product?.name || "Flacons d'Insuline 10ml"}
-              </Text>
+              <Text style={styles.productTitle}>{product.name}</Text>
               <Text style={styles.productSubtitle}>
-                {product?.description || "Insulin Glargine 100 UI/ml • Réf: LLY-8472-EU"}
+                {product.description || "Aucune description"}
               </Text>
             </View>
             <Pressable
@@ -206,7 +233,11 @@ export default function ProductDetailScreen() {
                 setTimeout(() => setToastMessage(null), 2000);
               }}
             >
-              <Ionicons name="copy-outline" size={18} color={stitchColors.textMuted} />
+              <Ionicons
+                name="copy-outline"
+                size={18}
+                color={stitchColors.textMuted}
+              />
             </Pressable>
           </View>
 
@@ -218,7 +249,9 @@ export default function ProductDetailScreen() {
                   <Ionicons name="alarm" size={16} color={stitchColors.error} />
                   <Text style={styles.expiryTagText}>PÉREMPTION CRITIQUE</Text>
                 </View>
-                <Text style={styles.expiryRemainingText}>20 jours restants</Text>
+                <Text style={styles.expiryRemainingText}>
+                  {product.expiry_date || "Date non renseignée"}
+                </Text>
               </View>
 
               <View style={styles.expiryProgressBg}>
@@ -227,7 +260,7 @@ export default function ProductDetailScreen() {
 
               <View style={styles.expiryFooterRow}>
                 <Text style={styles.expiryDateText}>
-                  Date limite : {product?.expiry_date || "15 Avril 2025"}
+                  Date limite : {product.expiry_date || "Non renseignée"}
                 </Text>
                 <Text style={styles.expiryAlertNotice}>Revue requise</Text>
               </View>
@@ -249,7 +282,7 @@ export default function ProductDetailScreen() {
             </View>
             <View style={styles.telemetryQuantityRow}>
               <Text style={styles.telemetryQuantityValue}>
-                {product?.quantity ?? 45}
+                {product.quantity}
               </Text>
               <Text style={styles.telemetryUnitText}>
                 {isMedical ? "flacons" : isIT ? "unités" : "pcs"}
@@ -257,31 +290,53 @@ export default function ProductDetailScreen() {
             </View>
             <View style={styles.telemetryCardFooter}>
               <Text style={styles.thresholdText}>
-                Seuil mini : {product?.reorder_threshold ?? 50} u.
+                Seuil mini : {product.reorder_threshold ?? "Non renseigné"} u.
               </Text>
-              <Ionicons name="alert-circle" size={16} color={stitchColors.error} />
+              <Ionicons
+                name="alert-circle"
+                size={16}
+                color={stitchColors.error}
+              />
             </View>
           </View>
 
           {/* Card 2: Cold Chain / Condition */}
           <View style={styles.telemetryCard}>
             <View style={styles.telemetryCardHeader}>
-              <Text style={[styles.telemetryCardLabel, { color: stitchColors.primary }]}>
+              <Text
+                style={[
+                  styles.telemetryCardLabel,
+                  { color: stitchColors.primary },
+                ]}
+              >
                 {isMedical ? "CHAÎNE DU FROID" : "ÉTAT MATÉRIEL"}
               </Text>
               <View style={styles.activeDot} />
             </View>
             <View style={styles.telemetryQuantityRow}>
-              <Text style={[styles.telemetryQuantityValue, { color: stitchColors.primary }]}>
-                {isMedical ? `${product?.storage_temperature ?? 4.1}°C` : product?.hardware_condition ?? "Neuf"}
+              <Text
+                style={[
+                  styles.telemetryQuantityValue,
+                  { color: stitchColors.primary },
+                ]}
+              >
+                {isMedical
+                  ? product.storage_temperature != null
+                    ? `${product.storage_temperature}°C`
+                    : "Non renseignée"
+                  : product.hardware_condition || "Non renseigné"}
               </Text>
               <Text style={styles.conformeText}>CONFORME</Text>
             </View>
             <View style={styles.telemetryCardFooter}>
               <Text style={styles.thresholdText}>
-                {isMedical ? "Cible : 2°C – 8°C" : `Affecté : ${product?.assigned_to || "Stock IT"}`}
+                {isMedical
+                  ? "Cible : 2°C – 8°C"
+                  : `Affecté : ${product.assigned_to || "Non renseigné"}`}
               </Text>
-              <Text style={styles.thresholdText}>Sonde #02</Text>
+              <Text style={styles.thresholdText}>
+                {product.warehouse_location || "Emplacement non renseigné"}
+              </Text>
             </View>
           </View>
         </View>
@@ -290,8 +345,14 @@ export default function ProductDetailScreen() {
         <View style={styles.traceabilityCard}>
           <View style={styles.traceabilityHeader}>
             <View style={styles.traceabilityTitleRow}>
-              <Ionicons name="qr-code-outline" size={18} color={stitchColors.primary} />
-              <Text style={styles.traceabilityTitleText}>Traçabilité & Identification</Text>
+              <Ionicons
+                name="qr-code-outline"
+                size={18}
+                color={stitchColors.primary}
+              />
+              <Text style={styles.traceabilityTitleText}>
+                Traçabilité & Identification
+              </Text>
             </View>
             <View style={styles.gmpBadge}>
               <Text style={styles.gmpText}>Validé GMP</Text>
@@ -304,35 +365,54 @@ export default function ProductDetailScreen() {
                 {isMedical ? "NUMÉRO DE LOT" : "NUMÉRO DE SÉRIE"}
               </Text>
               <Text style={styles.barcodeValue}>
-                {product?.batch_number || product?.serial_number || "MED-99201"}
+                {product.batch_number ||
+                  product.serial_number ||
+                  "Non renseigné"}
               </Text>
-              <Text style={styles.barcodeSub}>Fabr: Nov 2024 • Site EU-FR-Lyon</Text>
+              <Text style={styles.barcodeSub}>
+                {product.created_at
+                  ? new Date(product.created_at).toLocaleDateString("fr-FR")
+                  : "Date de création non renseignée"}
+              </Text>
             </View>
 
             {/* Visual Barcode Representation */}
             <View style={styles.visualBarcode}>
               <View style={styles.barcodeBarsContainer}>
-                {[3, 1, 4, 1, 3, 6, 2, 4, 1, 5, 2, 6, 1, 3, 4, 2].map((w, idx) => (
-                  <View
-                    key={idx}
-                    style={{
-                      width: w,
-                      height: 28,
-                      backgroundColor: stitchColors.text,
-                      marginRight: 2,
-                    }}
-                  />
-                ))}
+                {[3, 1, 4, 1, 3, 6, 2, 4, 1, 5, 2, 6, 1, 3, 4, 2].map(
+                  (w, idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        width: w,
+                        height: 28,
+                        backgroundColor: stitchColors.text,
+                        marginRight: 2,
+                      }}
+                    />
+                  ),
+                )}
               </View>
-              <Text style={styles.barcodeNumberText}>99201048472</Text>
+              <Text style={styles.barcodeNumberText}>
+                {product.sku ||
+                  product.batch_number ||
+                  product.serial_number ||
+                  ""}
+              </Text>
             </View>
           </View>
 
           <View style={styles.locationRow}>
-            <Ionicons name="business-outline" size={16} color={stitchColors.secondary} />
+            <Ionicons
+              name="business-outline"
+              size={16}
+              color={stitchColors.secondary}
+            />
             <Text style={styles.locationText}>
-              <Text style={{ fontWeight: "700", color: stitchColors.text }}>Pharma Nord : </Text>
-              {product?.warehouse_location || "Allée 4B • Étagère 2 • Frigo 02"}
+              <Text style={{ fontWeight: "700", color: stitchColors.text }}>
+                Emplacement :{" "}
+              </Text>
+              {product.warehouse_location || "Non renseigné"}
             </Text>
           </View>
         </View>
@@ -340,60 +420,29 @@ export default function ProductDetailScreen() {
         {/* 6. Storage Conditions */}
         <View style={styles.conditionsCard}>
           <View style={styles.conditionsIconBox}>
-            <MaterialCommunityIcons name="shield-check" size={26} color={stitchColors.primary} />
+            <MaterialCommunityIcons
+              name="shield-check"
+              size={26}
+              color={stitchColors.primary}
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.conditionsTitle}>Conditions de conservation</Text>
+            <Text style={styles.conditionsTitle}>
+              Conditions de conservation
+            </Text>
             <Text style={styles.conditionsText}>
-              Garder dans l'emballage d'origine à l'abri de la lumière directe. Ne pas congeler.
+              Garder dans l'emballage d'origine à l'abri de la lumière directe.
+              Ne pas congeler.
             </Text>
             <View style={styles.analysisCertRow}>
-              <Ionicons name="checkmark-circle" size={14} color={stitchColors.tertiary} />
-              <Text style={styles.analysisCertText}>Certificat d'analyse conforme</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* 7. Stock Velocity (30-day activity simulation) */}
-        <View style={styles.velocityCard}>
-          <View style={styles.velocityHeader}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Ionicons name="trending-up" size={18} color={stitchColors.primary} />
-              <Text style={styles.velocityTitle}>Flux & Consommation (30j)</Text>
-            </View>
-            <Text style={styles.velocityLastTime}>Dernier mvmt : Hier 16:30</Text>
-          </View>
-
-          {/* Sparkline Graphic Visualization */}
-          <View style={styles.sparklineContainer}>
-            <View style={styles.sparklineBarRow}>
-              {[30, 45, 40, 55, 60, 50, 42, 38, 45, 48, 52, 45].map((h, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.sparklineBar,
-                    {
-                      height: h,
-                      backgroundColor: i === 11 ? stitchColors.primary : "rgba(6,182,212,0.3)",
-                    },
-                  ]}
-                />
-              ))}
-            </View>
-            <View style={styles.thresholdLine} />
-            <Text style={styles.thresholdLabel}>SEUIL SÉCURITÉ (50)</Text>
-          </View>
-
-          <View style={styles.velocitySubMetrics}>
-            <View style={styles.subMetricCol}>
-              <Text style={styles.subMetricLabel}>Consommation moyenne</Text>
-              <Text style={styles.subMetricVal}>
-                3.2 <Text style={{ fontSize: 11, color: stitchColors.textMuted }}>flacons / jour</Text>
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={stitchColors.tertiary}
+              />
+              <Text style={styles.analysisCertText}>
+                Certificat d'analyse conforme
               </Text>
-            </View>
-            <View style={styles.subMetricCol}>
-              <Text style={styles.subMetricLabel}>Autonomie estimée</Text>
-              <Text style={[styles.subMetricVal, { color: stitchColors.error }]}>~14 jours</Text>
             </View>
           </View>
         </View>
@@ -405,7 +454,11 @@ export default function ProductDetailScreen() {
           style={styles.restockButton}
           onPress={() => triggerAction("restock")}
         >
-          <Ionicons name="add-circle-outline" size={18} color={stitchColors.primary} />
+          <Ionicons
+            name="add-circle-outline"
+            size={18}
+            color={stitchColors.primary}
+          />
           <Text style={styles.restockButtonText}>+ Entrée Stock</Text>
         </Pressable>
 
@@ -421,7 +474,11 @@ export default function ProductDetailScreen() {
       {/* Toast Feedback */}
       {toastMessage && (
         <View style={styles.toastContainer}>
-          <Ionicons name="checkmark-circle" size={20} color={stitchColors.tertiary} />
+          <Ionicons
+            name="checkmark-circle"
+            size={20}
+            color={stitchColors.tertiary}
+          />
           <Text style={styles.toastText}>{toastMessage}</Text>
         </View>
       )}

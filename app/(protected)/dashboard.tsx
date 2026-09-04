@@ -1,8 +1,8 @@
-import React, { useCallback, useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,13 +11,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useRouter } from "expo-router";
 
 import { stitchColors, useTheme } from "@/components/themeProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { inventoryService } from "@/services/inventory";
-import { DashboardMetrics, Product, SectorType } from "@/types";
+import { movementService } from "@/services/movements";
+import { DashboardMetrics, Product, SectorType, StockMovement } from "@/types";
 
 const { width } = Dimensions.get("window");
 
@@ -29,21 +28,28 @@ export default function DashboardScreen() {
   const [activeSector, setActiveSector] = useState<SectorType>("medical");
   const [products, setProducts] = useState<Product[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const [productsData, statsData] = await Promise.allSettled([
-        inventoryService.getProducts({ sector: activeSector }),
-        inventoryService.getDashboardStats(),
-      ]);
+      const [productsData, statsData, movementsData] = await Promise.allSettled(
+        [
+          inventoryService.getProducts({ sector: activeSector }),
+          inventoryService.getDashboardStats(),
+          movementService.getMovements(),
+        ],
+      );
 
       if (productsData.status === "fulfilled") {
         setProducts(productsData.value);
       }
       if (statsData.status === "fulfilled") {
         setMetrics(statsData.value);
+      }
+      if (movementsData.status === "fulfilled") {
+        setMovements(movementsData.value.slice(0, 3));
       }
     } catch (error) {
       console.error("Erreur chargement dashboard:", error);
@@ -64,18 +70,28 @@ export default function DashboardScreen() {
     fetchDashboardData();
   };
 
+  const productNames = new Map(
+    products.map((product) => [product.id, product.name]),
+  );
+
   const handleLogout = async () => {
     await logout();
     router.replace("/");
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: stitchColors.bgDark }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: stitchColors.bgDark }]}
+    >
       {/* 1. Header (Sticky App Bar) */}
       <View style={styles.appBar}>
         <View style={styles.brandRow}>
           <View style={styles.logoBox}>
-            <Ionicons name="cube-outline" size={18} color={stitchColors.primary} />
+            <Ionicons
+              name="cube-outline"
+              size={18}
+              color={stitchColors.primary}
+            />
           </View>
           <View>
             <Text style={styles.brandTitle}>OMNISTOCK</Text>
@@ -90,7 +106,11 @@ export default function DashboardScreen() {
             hitSlop={8}
             accessibilityLabel="Se déconnecter"
           >
-            <Ionicons name="log-out-outline" size={20} color={stitchColors.textMuted} />
+            <Ionicons
+              name="log-out-outline"
+              size={20}
+              color={stitchColors.textMuted}
+            />
           </Pressable>
 
           <View style={styles.avatarWrapper}>
@@ -108,7 +128,13 @@ export default function DashboardScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={stitchColors.primary} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={stitchColors.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         {/* 2. Sector Filter Header (Segmented Pills) */}
@@ -127,7 +153,12 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.sectorPulseDot,
-                { backgroundColor: activeSector === "medical" ? stitchColors.primary : stitchColors.border },
+                {
+                  backgroundColor:
+                    activeSector === "medical"
+                      ? stitchColors.primary
+                      : stitchColors.border,
+                },
               ]}
             />
             <Text
@@ -150,13 +181,21 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.sectorPulseDot,
-                { backgroundColor: activeSector === "it" ? stitchColors.secondary : stitchColors.border },
+                {
+                  backgroundColor:
+                    activeSector === "it"
+                      ? stitchColors.secondary
+                      : stitchColors.border,
+                },
               ]}
             />
             <Text
               style={[
                 styles.sectorPillText,
-                activeSector === "it" && { color: stitchColors.secondary, fontWeight: "700" },
+                activeSector === "it" && {
+                  color: stitchColors.secondary,
+                  fontWeight: "700",
+                },
               ]}
             >
               Matériel IT
@@ -173,13 +212,21 @@ export default function DashboardScreen() {
             <View
               style={[
                 styles.sectorPulseDot,
-                { backgroundColor: activeSector === "general" ? stitchColors.tertiary : stitchColors.border },
+                {
+                  backgroundColor:
+                    activeSector === "general"
+                      ? stitchColors.tertiary
+                      : stitchColors.border,
+                },
               ]}
             />
             <Text
               style={[
                 styles.sectorPillText,
-                activeSector === "general" && { color: stitchColors.tertiary, fontWeight: "700" },
+                activeSector === "general" && {
+                  color: stitchColors.tertiary,
+                  fontWeight: "700",
+                },
               ]}
             >
               Général / Logistique
@@ -200,23 +247,30 @@ export default function DashboardScreen() {
             </View>
             <View>
               <View style={styles.hubTitleRow}>
-                <Text style={styles.hubTitleText}>Pharmacie Centrale • Hub 04</Text>
+                <Text style={styles.hubTitleText}>
+                  {metrics?.cold_chain.hub || "Site non renseigné"}
+                </Text>
                 <View style={styles.liveSyncBadge}>
-                  <Text style={styles.liveSyncText}>LIVE SYNC</Text>
+                  <Text style={styles.liveSyncText}>BASE DE DONNÉES</Text>
                 </View>
               </View>
               <Text style={styles.hubSubtitleText}>
-                Dernière vérif. cold-chain : 14:02 CET
+                {metrics?.cold_chain.current_temp === null
+                  ? "Température non renseignée"
+                  : "Température issue de la base"}
               </Text>
             </View>
           </View>
 
           <View style={styles.statusBannerRight}>
             <Text style={styles.tempValueText}>
-              {metrics ? `+${metrics.cold_chain.current_temp}°C` : "+4.2°C"}
+              {metrics?.cold_chain.current_temp !== null &&
+              metrics?.cold_chain.current_temp !== undefined
+                ? `+${metrics.cold_chain.current_temp}°C`
+                : "--"}
             </Text>
             <Text style={styles.tempStatusText}>
-              {metrics ? metrics.cold_chain.status : "Normal"}
+              {metrics ? metrics.cold_chain.status : "Données indisponibles"}
             </Text>
           </View>
         </View>
@@ -226,24 +280,37 @@ export default function DashboardScreen() {
           {/* Card 1: Total Units */}
           <View style={styles.metricCard}>
             <View style={styles.metricCardHeader}>
-              <View style={[styles.metricIconBox, { backgroundColor: "rgba(6,182,212,0.12)" }]}>
-                <Ionicons name="cube-outline" size={18} color={stitchColors.primary} />
+              <View
+                style={[
+                  styles.metricIconBox,
+                  { backgroundColor: "rgba(6,182,212,0.12)" },
+                ]}
+              >
+                <Ionicons
+                  name="cube-outline"
+                  size={18}
+                  color={stitchColors.primary}
+                />
               </View>
               <View style={styles.trendPill}>
-                <Ionicons name="trending-up" size={12} color={stitchColors.tertiary} />
-                <Text style={styles.trendText}>+4.2%</Text>
+                <Ionicons
+                  name="trending-up"
+                  size={12}
+                  color={stitchColors.tertiary}
+                />
+                <Text style={styles.trendText}>Base de référence</Text>
               </View>
             </View>
             <View style={styles.metricBody}>
               <Text style={styles.metricMainValue}>
-                {metrics?.total_units ?? "14 820"}
+                {metrics?.total_units ?? "--"}
               </Text>
               <Text style={styles.metricLabel}>UNITÉS TOTALES</Text>
             </View>
             <View style={styles.metricFooter}>
               <Text style={styles.metricFooterLabel}>Actifs</Text>
               <Text style={styles.metricFooterValue}>
-                {metrics ? `${metrics.active_references} réf` : "348 réf"}
+                {metrics ? `${metrics.active_references} réf` : "--"}
               </Text>
             </View>
           </View>
@@ -251,26 +318,60 @@ export default function DashboardScreen() {
           {/* Card 2: Critical Stock */}
           <View style={styles.metricCard}>
             <View style={styles.metricCardHeader}>
-              <View style={[styles.metricIconBox, { backgroundColor: "rgba(239,68,68,0.15)" }]}>
-                <Ionicons name="warning-outline" size={18} color={stitchColors.error} />
+              <View
+                style={[
+                  styles.metricIconBox,
+                  { backgroundColor: "rgba(239,68,68,0.15)" },
+                ]}
+              >
+                <Ionicons
+                  name="warning-outline"
+                  size={18}
+                  color={stitchColors.error}
+                />
               </View>
-              <View style={[styles.badgePill, { backgroundColor: "rgba(239,68,68,0.2)" }]}>
-                <Text style={[styles.badgePillText, { color: stitchColors.error }]}>REQUIS</Text>
+              <View
+                style={[
+                  styles.badgePill,
+                  { backgroundColor: "rgba(239,68,68,0.2)" },
+                ]}
+              >
+                <Text
+                  style={[styles.badgePillText, { color: stitchColors.error }]}
+                >
+                  REQUIS
+                </Text>
               </View>
             </View>
             <View style={styles.metricBody}>
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
-                <Text style={[styles.metricMainValue, { color: stitchColors.error }]}>
-                  {metrics?.critical_stock_count ?? "12"}
+              <View
+                style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}
+              >
+                <Text
+                  style={[
+                    styles.metricMainValue,
+                    { color: stitchColors.error },
+                  ]}
+                >
+                  {metrics?.critical_stock_count ?? "--"}
                 </Text>
-                <Text style={[styles.metricUnit, { color: stitchColors.error }]}>réf</Text>
+                <Text
+                  style={[styles.metricUnit, { color: stitchColors.error }]}
+                >
+                  réf
+                </Text>
               </View>
               <Text style={styles.metricLabel}>STOCK CRITIQUE</Text>
             </View>
             <View style={styles.metricFooter}>
               <Text style={styles.metricFooterLabel}>Sous le seuil</Text>
-              <Text style={[styles.metricFooterValue, { color: stitchColors.error }]}>
-                &lt; 15%
+              <Text
+                style={[
+                  styles.metricFooterValue,
+                  { color: stitchColors.error },
+                ]}
+              >
+                {metrics ? "Seuil configuré" : "--"}
               </Text>
             </View>
           </View>
@@ -278,47 +379,119 @@ export default function DashboardScreen() {
           {/* Card 3: Expiring Soon */}
           <View style={styles.metricCard}>
             <View style={styles.metricCardHeader}>
-              <View style={[styles.metricIconBox, { backgroundColor: "rgba(139,92,246,0.15)" }]}>
-                <Ionicons name="alarm-outline" size={18} color={stitchColors.secondary} />
+              <View
+                style={[
+                  styles.metricIconBox,
+                  { backgroundColor: "rgba(139,92,246,0.15)" },
+                ]}
+              >
+                <Ionicons
+                  name="alarm-outline"
+                  size={18}
+                  color={stitchColors.secondary}
+                />
               </View>
-              <View style={[styles.badgePill, { backgroundColor: "rgba(139,92,246,0.2)" }]}>
-                <Text style={[styles.badgePillText, { color: stitchColors.secondary }]}>SENSIBLE</Text>
+              <View
+                style={[
+                  styles.badgePill,
+                  { backgroundColor: "rgba(139,92,246,0.2)" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgePillText,
+                    { color: stitchColors.secondary },
+                  ]}
+                >
+                  SENSIBLE
+                </Text>
               </View>
             </View>
             <View style={styles.metricBody}>
-              <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
-                <Text style={[styles.metricMainValue, { color: stitchColors.secondary }]}>
-                  {metrics?.expiring_soon_count ?? "8"}
+              <View
+                style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}
+              >
+                <Text
+                  style={[
+                    styles.metricMainValue,
+                    { color: stitchColors.secondary },
+                  ]}
+                >
+                  {metrics?.expiring_soon_count ?? "--"}
                 </Text>
-                <Text style={[styles.metricUnit, { color: stitchColors.secondary }]}>lots</Text>
+                <Text
+                  style={[styles.metricUnit, { color: stitchColors.secondary }]}
+                >
+                  lots
+                </Text>
               </View>
               <Text style={styles.metricLabel}>PÉRIMANT &lt; 30J</Text>
             </View>
             <View style={styles.metricFooter}>
               <Text style={styles.metricFooterLabel}>Prochain lot</Text>
-              <Text style={[styles.metricFooterValue, { color: stitchColors.error }]}>J-7</Text>
+              <Text
+                style={[
+                  styles.metricFooterValue,
+                  { color: stitchColors.error },
+                ]}
+              >
+                {metrics ? "Voir les produits" : "--"}
+              </Text>
             </View>
           </View>
 
           {/* Card 4: Turnover Rate */}
           <View style={styles.metricCard}>
             <View style={styles.metricCardHeader}>
-              <View style={[styles.metricIconBox, { backgroundColor: "rgba(16,185,129,0.15)" }]}>
-                <Ionicons name="sync-outline" size={18} color={stitchColors.tertiary} />
+              <View
+                style={[
+                  styles.metricIconBox,
+                  { backgroundColor: "rgba(16,185,129,0.15)" },
+                ]}
+              >
+                <Ionicons
+                  name="sync-outline"
+                  size={18}
+                  color={stitchColors.tertiary}
+                />
               </View>
-              <View style={[styles.badgePill, { backgroundColor: "rgba(16,185,129,0.2)" }]}>
-                <Text style={[styles.badgePillText, { color: stitchColors.tertiary }]}>OPTIMAL</Text>
+              <View
+                style={[
+                  styles.badgePill,
+                  { backgroundColor: "rgba(16,185,129,0.2)" },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgePillText,
+                    { color: stitchColors.tertiary },
+                  ]}
+                >
+                  {metrics?.turnover_rate === null
+                    ? "NON DISPONIBLE"
+                    : "CALCULÉ"}
+                </Text>
               </View>
             </View>
             <View style={styles.metricBody}>
-              <Text style={[styles.metricMainValue, { color: stitchColors.tertiary }]}>
-                {metrics ? `${metrics.turnover_rate}%` : "94.8%"}
+              <Text
+                style={[
+                  styles.metricMainValue,
+                  { color: stitchColors.tertiary },
+                ]}
+              >
+                {metrics?.turnover_rate !== null &&
+                metrics?.turnover_rate !== undefined
+                  ? `${metrics.turnover_rate}%`
+                  : "--"}
               </Text>
               <Text style={styles.metricLabel}>TAUX ROTATION</Text>
             </View>
             <View style={styles.metricFooter}>
               <Text style={styles.metricFooterLabel}>Cycle moyen</Text>
-              <Text style={styles.metricFooterValue}>18.4j</Text>
+              <Text style={styles.metricFooterValue}>
+                Donnée non disponible
+              </Text>
             </View>
           </View>
         </View>
@@ -326,28 +499,45 @@ export default function DashboardScreen() {
         {/* 5. Warehouse Quick Action Triggers */}
         <View style={styles.quickActionsSection}>
           {/* Highlight Card linking to Fiche Produit */}
-          <Pressable
-            style={styles.highlightProductCard}
-            onPress={() => router.push("/(protected)/inventory/1" as any)}
-          >
-            <View style={styles.highlightProductStripe} />
-            <View style={styles.highlightProductLeft}>
-              <View style={styles.highlightIcon}>
-                <Ionicons name="arrow-forward-outline" size={18} color={stitchColors.error} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.highlightNameRow}>
-                  <Text style={styles.highlightNameText}>Insuline Vials 10ml</Text>
-                  <Text style={styles.highlightLocationBadge}>Aisle 4B</Text>
+          {products[0] && (
+            <Pressable
+              style={styles.highlightProductCard}
+              onPress={() =>
+                router.push(`/(protected)/inventory/${products[0].id}` as any)
+              }
+            >
+              <View style={styles.highlightProductStripe} />
+              <View style={styles.highlightProductLeft}>
+                <View style={styles.highlightIcon}>
+                  <Ionicons
+                    name="arrow-forward-outline"
+                    size={18}
+                    color={stitchColors.error}
+                  />
                 </View>
-                <Text style={styles.highlightOperatorText}>Dr. Dupont • Urgences Médicales</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.highlightNameRow}>
+                    <Text style={styles.highlightNameText}>
+                      {products[0].name}
+                    </Text>
+                    <Text style={styles.highlightLocationBadge}>
+                      {products[0].sku || "Produit"}
+                    </Text>
+                  </View>
+                  <Text style={styles.highlightOperatorText}>
+                    {products[0].warehouse_location ||
+                      "Emplacement non renseigné"}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.highlightProductRight}>
-              <Text style={styles.highlightQtyDelta}>-40 U</Text>
-              <Text style={styles.highlightTimeText}>12 min</Text>
-            </View>
-          </Pressable>
+              <View style={styles.highlightProductRight}>
+                <Text style={styles.highlightQtyDelta}>
+                  {products[0].quantity} U
+                </Text>
+                <Text style={styles.highlightTimeText}>Stock</Text>
+              </View>
+            </Pressable>
+          )}
 
           {/* Quick Action 3-Col Buttons */}
           <View style={styles.quickButtonsGrid}>
@@ -363,162 +553,122 @@ export default function DashboardScreen() {
 
             <Pressable
               style={styles.secondaryActionButton}
-              onPress={() => router.push("/(protected)/scanner" as any)}
+              onPress={() =>
+                router.push(
+                  "/(protected)/movements/create?movementType=IN" as any,
+                )
+              }
             >
               <View style={styles.secondaryActionIcon}>
-                <Ionicons name="add-circle-outline" size={22} color={stitchColors.tertiary} />
+                <Ionicons
+                  name="add-circle-outline"
+                  size={22}
+                  color={stitchColors.tertiary}
+                />
               </View>
               <Text style={styles.secondaryActionText}>Entrée Stock</Text>
             </Pressable>
 
             <Pressable
               style={styles.secondaryActionButton}
-              onPress={() => router.push("/(protected)/scanner" as any)}
+              onPress={() =>
+                router.push(
+                  "/(protected)/movements/create?movementType=OUT" as any,
+                )
+              }
             >
               <View style={styles.secondaryActionIcon}>
-                <Ionicons name="swap-horizontal" size={22} color={stitchColors.secondary} />
+                <Ionicons
+                  name="swap-horizontal"
+                  size={22}
+                  color={stitchColors.secondary}
+                />
               </View>
-              <Text style={styles.secondaryActionText}>Transfert</Text>
+              <Text style={styles.secondaryActionText}>Sortie Stock</Text>
             </Pressable>
-          </View>
-        </View>
-
-        {/* 6. High-Tech Telemetry Banner */}
-        <View style={styles.telemetryBanner}>
-          <View style={styles.telemetryIconContainer}>
-            <MaterialCommunityIcons name="snowflake" size={24} color={stitchColors.primary} />
-          </View>
-          <View style={styles.telemetryInfoCol}>
-            <View style={styles.telemetryHeaderRow}>
-              <Text style={styles.telemetryZoneTitle}>ZONE FRIGORIFIQUE B</Text>
-              <Text style={styles.telemetryCapacityValue}>CAPACITÉ 82%</Text>
-            </View>
-            <View style={styles.capacityProgressBarBg}>
-              <View style={[styles.capacityProgressBarFill, { width: "82%" }]} />
-            </View>
-            <Text style={styles.telemetrySubtext}>Système d'aspiration automatisé calibré</Text>
           </View>
         </View>
 
         {/* 7. Recent Activity Stream */}
         <View style={styles.activitySection}>
           <View style={styles.activityHeaderRow}>
-            <Text style={styles.activityHeading}>FLUX D'ACTIVITÉ RÉCENT</Text>
-            <Pressable onPress={() => router.push("/(protected)/movements/history" as any)}>
-              <Text style={styles.seeAllText}>Voir l'historique</Text>
+            <Text style={styles.activityHeading}>
+              FLUX D&apos;ACTIVITÉ RÉCENT
+            </Text>
+            <Pressable
+              onPress={() =>
+                router.push("/(protected)/movements/history" as any)
+              }
+            >
+              <Text style={styles.seeAllText}>Voir l&apos;historique</Text>
             </Pressable>
           </View>
 
-          {/* Item 1: Outbound Pharma */}
-          <Pressable
-            style={styles.activityItemCard}
-            onPress={() => router.push("/(protected)/inventory/1" as any)}
-          >
-            <View style={[styles.activityStripe, { backgroundColor: stitchColors.tertiary }]} />
-            <View style={styles.activityLeft}>
-              <View style={[styles.activityIconBox, { backgroundColor: "rgba(239,68,68,0.15)" }]}>
-                <Ionicons name="arrow-forward-outline" size={16} color={stitchColors.error} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.activityTitleRow}>
-                  <Text style={styles.activityItemTitle}>Insuline Vials 10ml</Text>
-                  <Text style={styles.activityLotPill}>Aisle 4B</Text>
-                </View>
-                <Text style={styles.activityItemSub}>Dr. Dupont • Urgences Médicales</Text>
-              </View>
-            </View>
-            <View style={styles.activityRight}>
-              <Text style={[styles.activityDelta, { color: stitchColors.error }]}>-40 U</Text>
-              <Text style={styles.activityTime}>12 min</Text>
-            </View>
-          </Pressable>
-
-          {/* Item 2: Inbound IT */}
-          <View style={styles.activityItemCard}>
-            <View style={[styles.activityStripe, { backgroundColor: stitchColors.secondary }]} />
-            <View style={styles.activityLeft}>
-              <View style={[styles.activityIconBox, { backgroundColor: "rgba(16,185,129,0.15)" }]}>
-                <Ionicons name="arrow-down-outline" size={16} color={stitchColors.tertiary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.activityTitleRow}>
-                  <Text style={styles.activityItemTitle}>MacBook Pro M3 16"</Text>
-                  <Text style={[styles.activityLotPill, { color: stitchColors.secondary }]}>IT-02</Text>
-                </View>
-                <Text style={styles.activityItemSub}>Lot #IT-8842-DK</Text>
-              </View>
-            </View>
-            <View style={styles.activityRight}>
-              <Text style={[styles.activityDelta, { color: stitchColors.tertiary }]}>+15 U</Text>
-              <Text style={styles.activityTime}>1h</Text>
-            </View>
-          </View>
-
-          {/* Item 3: Critical Expiry */}
-          <View style={styles.activityItemCard}>
-            <View style={[styles.activityStripe, { backgroundColor: stitchColors.error }]} />
-            <View style={styles.activityLeft}>
-              <View style={[styles.activityIconBox, { backgroundColor: "rgba(239,68,68,0.2)" }]}>
-                <Ionicons name="warning" size={16} color={stitchColors.error} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.activityTitleRow}>
-                  <Text style={[styles.activityItemTitle, { color: stitchColors.error }]}>Vaccin ROR pédiatrique</Text>
-                  <Text style={[styles.activityLotPill, { color: stitchColors.error }]}>CRITIQUE</Text>
-                </View>
-                <Text style={styles.activityItemSub}>Lot #VAC-2024-09</Text>
-              </View>
-            </View>
-            <View style={styles.activityRight}>
-              <Text style={[styles.activityDelta, { color: stitchColors.error }]}>J-18</Text>
-              <Text style={styles.activityTime}>Lot &lt; 30j</Text>
-            </View>
-          </View>
+          {movements.length === 0 ? (
+            <Text style={styles.activityItemSub}>
+              Aucun mouvement enregistré.
+            </Text>
+          ) : (
+            movements.map((movement) => {
+              const isEntry = movement.movement_type === "IN";
+              const accent = isEntry
+                ? stitchColors.tertiary
+                : stitchColors.error;
+              return (
+                <Pressable
+                  key={movement.id}
+                  style={styles.activityItemCard}
+                  onPress={() =>
+                    router.push(
+                      `/(protected)/inventory/${movement.product_id}` as any,
+                    )
+                  }
+                >
+                  <View
+                    style={[styles.activityStripe, { backgroundColor: accent }]}
+                  />
+                  <View style={styles.activityLeft}>
+                    <View
+                      style={[
+                        styles.activityIconBox,
+                        {
+                          backgroundColor: isEntry
+                            ? "rgba(16,185,129,0.15)"
+                            : "rgba(239,68,68,0.15)",
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={
+                          isEntry
+                            ? "arrow-down-outline"
+                            : "arrow-forward-outline"
+                        }
+                        size={16}
+                        color={accent}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.activityItemTitle} numberOfLines={1}>
+                        {productNames.get(movement.product_id) ||
+                          `Produit #${movement.product_id}`}
+                      </Text>
+                      <Text style={styles.activityItemSub} numberOfLines={1}>
+                        {movement.reason || "Sans motif"} ·{" "}
+                        {new Date(movement.created_at).toLocaleString("fr-FR")}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.activityDelta, { color: accent }]}>
+                    {isEntry ? "+" : "-"}
+                    {movement.quantity} U
+                  </Text>
+                </Pressable>
+              );
+            })
+          )}
         </View>
       </ScrollView>
-
-      {/* 8. Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
-        <Pressable style={styles.navItem} onPress={() => {}}>
-          <Ionicons name="grid" size={22} color={stitchColors.primary} />
-          <Text style={[styles.navText, { color: stitchColors.primary }]}>Dashboard</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.navItem}
-          onPress={() => router.push("/(protected)/inventory" as any)}
-        >
-          <Ionicons name="cube-outline" size={22} color={stitchColors.textMuted} />
-          <Text style={styles.navText}>Inventaire</Text>
-        </Pressable>
-
-        {/* Center Floating Scanner Trigger */}
-        <View style={styles.navScanWrapper}>
-          <Pressable
-            style={styles.navScanPill}
-            onPress={() => router.push("/(protected)/scanner" as any)}
-          >
-            <Ionicons name="scan" size={26} color="#0B0F17" />
-          </Pressable>
-          <Text style={[styles.navText, { marginTop: 4 }]}>Scanner</Text>
-        </View>
-
-        <Pressable
-          style={styles.navItem}
-          onPress={() => router.push("/(protected)/movements/history" as any)}
-        >
-          <Ionicons name="swap-horizontal-outline" size={22} color={stitchColors.textMuted} />
-          <Text style={styles.navText}>Mouvements</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.navItem}
-          onPress={() => router.push("/(protected)/categories" as any)}
-        >
-          <Ionicons name="settings-outline" size={22} color={stitchColors.textMuted} />
-          <Text style={styles.navText}>Paramètres</Text>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
@@ -606,7 +756,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 90,
+    paddingBottom: 24,
     gap: 16,
   },
   sectorPillsContainer: {
@@ -1075,48 +1225,5 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 10,
     color: stitchColors.textMuted,
-  },
-  bottomNav: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 70,
-    backgroundColor: "rgba(11,15,23,0.96)",
-    borderTopWidth: 1,
-    borderTopColor: stitchColors.border,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 8,
-  },
-  navItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 60,
-  },
-  navText: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: stitchColors.textMuted,
-    marginTop: 3,
-  },
-  navScanWrapper: {
-    position: "relative",
-    top: -14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navScanPill: {
-    width: 50,
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: stitchColors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: stitchColors.primary,
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 6,
   },
 });
