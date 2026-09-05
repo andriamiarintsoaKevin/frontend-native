@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import { Picker } from "@react-native-picker/picker";
+import { useIsFocused } from "expo-router";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Pressable,
@@ -8,7 +10,8 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { Category, Product } from "../../types";
+import { Category, Product, SectorType } from "../../types";
+import ErrorNotice from "../errorNotice";
 import { useTheme } from "../themeProvider";
 
 interface ProductFormProps {
@@ -27,6 +30,7 @@ export default function ProductForm({
   isLoading,
 }: ProductFormProps) {
   const { colors } = useTheme();
+  const isFocused = useIsFocused();
 
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(
@@ -41,7 +45,67 @@ export default function ProductForm({
   const [categoryId, setCategoryId] = useState<number | undefined>(
     initialData?.category_id,
   );
+  const [sku, setSku] = useState(initialData?.sku || "");
+  const [sector, setSector] = useState(initialData?.sector || "general");
+  const [reorderThreshold, setReorderThreshold] = useState(
+    initialData?.reorder_threshold?.toString() || "10",
+  );
+  const [warehouseLocation, setWarehouseLocation] = useState(
+    initialData?.warehouse_location || "",
+  );
+  const [batchNumber, setBatchNumber] = useState(
+    initialData?.batch_number || "",
+  );
+  const [expiryDate, setExpiryDate] = useState(
+    initialData?.expiry_date?.slice(0, 10) || "",
+  );
+  const [storageTemperature, setStorageTemperature] = useState(
+    initialData?.storage_temperature?.toString() || "",
+  );
+  const [serialNumber, setSerialNumber] = useState(
+    initialData?.serial_number || "",
+  );
+  const [hardwareCondition, setHardwareCondition] = useState(
+    initialData?.hardware_condition || "",
+  );
+  const [assignedTo, setAssignedTo] = useState(initialData?.assigned_to || "");
   const [error, setError] = useState("");
+
+  const handleSectorChange = (nextSector: SectorType) => {
+    setSector(nextSector);
+
+    if (nextSector !== "medical") {
+      setBatchNumber("");
+      setExpiryDate("");
+      setStorageTemperature("");
+    }
+
+    if (nextSector !== "it") {
+      setSerialNumber("");
+      setHardwareCondition("");
+      setAssignedTo("");
+    }
+  };
+
+  useEffect(() => {
+    if (isFocused) return;
+    setName("");
+    setDescription("");
+    setPrice("");
+    setQuantity("0");
+    setCategoryId(undefined);
+    setSku("");
+    setSector("general");
+    setReorderThreshold("10");
+    setWarehouseLocation("");
+    setBatchNumber("");
+    setExpiryDate("");
+    setStorageTemperature("");
+    setSerialNumber("");
+    setHardwareCondition("");
+    setAssignedTo("");
+    setError("");
+  }, [isFocused]);
 
   const handleSubmit = async () => {
     setError("");
@@ -53,6 +117,10 @@ export default function ProductForm({
 
     const parsedPrice = parseFloat(price.replace(",", "."));
     const parsedQuantity = parseInt(quantity, 10);
+    const parsedThreshold = parseInt(reorderThreshold, 10);
+    const parsedTemperature = storageTemperature
+      ? parseFloat(storageTemperature.replace(",", "."))
+      : undefined;
 
     if (isNaN(parsedPrice) || parsedPrice < 0) {
       setError("Le prix unitaire doit être positif ou nul.");
@@ -64,6 +132,21 @@ export default function ProductForm({
       return;
     }
 
+    if (isNaN(parsedThreshold) || parsedThreshold < 0) {
+      setError("Le seuil de réapprovisionnement est invalide.");
+      return;
+    }
+
+    if (parsedTemperature !== undefined && isNaN(parsedTemperature)) {
+      setError("La température de stockage est invalide.");
+      return;
+    }
+
+    if (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) {
+      setError("La date doit respecter le format AAAA-MM-JJ.");
+      return;
+    }
+
     try {
       await onSubmit({
         name: name.trim(),
@@ -71,6 +154,19 @@ export default function ProductForm({
         price: parsedPrice,
         quantity: parsedQuantity,
         category_id: categoryId,
+        sku: sku.trim() || null,
+        sector,
+        reorder_threshold: parsedThreshold,
+        warehouse_location: warehouseLocation.trim() || null,
+        batch_number: sector === "medical" ? batchNumber.trim() || null : null,
+        expiry_date:
+          sector === "medical" && expiryDate ? `${expiryDate}T00:00:00Z` : null,
+        storage_temperature:
+          sector === "medical" ? (parsedTemperature ?? null) : null,
+        serial_number: sector === "it" ? serialNumber.trim() || null : null,
+        hardware_condition:
+          sector === "it" ? hardwareCondition.trim() || null : null,
+        assigned_to: sector === "it" ? assignedTo.trim() || null : null,
       });
     } catch (e: any) {
       setError(e.message || "Une erreur est survenue");
@@ -79,7 +175,7 @@ export default function ProductForm({
 
   return (
     <ScrollView style={styles.container}>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <ErrorNotice message={error} /> : null}
 
       <Text style={[styles.label, { color: colors.text }]}>
         Nom du produit *
@@ -106,37 +202,56 @@ export default function ProductForm({
           { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
         ]}
       >
-        {/* Simple mock picker. For a real app, use @react-native-picker/picker or a custom modal */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
+        <Picker
+          selectedValue={categoryId}
+          onValueChange={(value) => setCategoryId(value)}
+          style={{ color: colors.text }}
+          dropdownIconColor={colors.textMuted}
         >
-          {categories.map((cat) => (
-            <Pressable
-              key={cat.id}
-              style={[
-                styles.categoryBadge,
-                {
-                  backgroundColor:
-                    categoryId === cat.id ? colors.primary : colors.surface,
-                  borderColor:
-                    categoryId === cat.id ? colors.primary : colors.border,
-                },
-              ]}
-              onPress={() => setCategoryId(cat.id)}
-            >
-              <Text
-                style={{
-                  color: categoryId === cat.id ? colors.onPrimary : colors.text,
-                }}
-              >
-                {cat.name}
-              </Text>
-            </Pressable>
+          <Picker.Item label="Sélectionner une catégorie" value={undefined} />
+          {categories.map((category) => (
+            <Picker.Item
+              key={category.id}
+              label={category.name}
+              value={category.id}
+            />
           ))}
-        </ScrollView>
+        </Picker>
       </View>
+
+      <Text style={[styles.label, { color: colors.text }]}>Secteur *</Text>
+      <View
+        style={[
+          styles.pickerContainer,
+          { backgroundColor: colors.inputBg, borderColor: colors.inputBorder },
+        ]}
+      >
+        <Picker
+          selectedValue={sector}
+          onValueChange={(value) => handleSectorChange(value as SectorType)}
+          style={{ color: colors.text }}
+          dropdownIconColor={colors.textMuted}
+        >
+          <Picker.Item label="Général / Logistique" value="general" />
+          <Picker.Item label="Médical / Pharma" value="medical" />
+          <Picker.Item label="Matériel IT" value="it" />
+        </Picker>
+      </View>
+
+      <Text style={[styles.label, { color: colors.text }]}>
+        SKU / code scanner
+      </Text>
+      <TextInput {...inputProps(colors, sku, setSku, "PARA-500-001")} />
+
+      <Text style={[styles.label, { color: colors.text }]}>Emplacement</Text>
+      <TextInput
+        {...inputProps(
+          colors,
+          warehouseLocation,
+          setWarehouseLocation,
+          "A-01-03",
+        )}
+      />
 
       <Text style={[styles.label, { color: colors.text }]}>Prix (€) *</Text>
       <TextInput
@@ -171,6 +286,80 @@ export default function ProductForm({
         placeholder="0"
         placeholderTextColor={colors.textMuted}
       />
+
+      <Text style={[styles.label, { color: colors.text }]}>
+        Seuil de réapprovisionnement
+      </Text>
+      <TextInput
+        {...inputProps(colors, reorderThreshold, setReorderThreshold, "10")}
+        keyboardType="number-pad"
+      />
+
+      {sector === "medical" && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Données médicales
+          </Text>
+          <Text style={[styles.label, { color: colors.text }]}>
+            Numéro de lot
+          </Text>
+          <TextInput
+            {...inputProps(colors, batchNumber, setBatchNumber, "LOT-2026-09")}
+          />
+          <Text style={[styles.label, { color: colors.text }]}>
+            Date d'expiration (AAAA-MM-JJ)
+          </Text>
+          <TextInput
+            {...inputProps(colors, expiryDate, setExpiryDate, "2027-09-04")}
+          />
+          <Text style={[styles.label, { color: colors.text }]}>
+            Température de stockage (°C)
+          </Text>
+          <TextInput
+            {...inputProps(
+              colors,
+              storageTemperature,
+              setStorageTemperature,
+              "4",
+            )}
+            keyboardType="decimal-pad"
+          />
+        </>
+      )}
+
+      {sector === "it" && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Données matériel IT
+          </Text>
+          <Text style={[styles.label, { color: colors.text }]}>
+            Numéro de série
+          </Text>
+          <TextInput
+            {...inputProps(colors, serialNumber, setSerialNumber, "SN-001")}
+          />
+          <Text style={[styles.label, { color: colors.text }]}>
+            État du matériel
+          </Text>
+          <TextInput
+            {...inputProps(
+              colors,
+              hardwareCondition,
+              setHardwareCondition,
+              "Neuf",
+            )}
+          />
+          <Text style={[styles.label, { color: colors.text }]}>Attribué à</Text>
+          <TextInput
+            {...inputProps(
+              colors,
+              assignedTo,
+              setAssignedTo,
+              "Service informatique",
+            )}
+          />
+        </>
+      )}
 
       <Text style={[styles.label, { color: colors.text }]}>Description</Text>
       <TextInput
@@ -237,6 +426,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 12,
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 22,
+    marginBottom: 2,
+  },
   input: {
     borderWidth: 1,
     borderRadius: 8,
@@ -262,11 +457,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginRight: 8,
   },
-  errorText: {
-    color: "#ef4444",
-    marginBottom: 16,
-    textAlign: "center",
-  },
   buttonContainer: {
     flexDirection: "row",
     marginTop: 24,
@@ -289,3 +479,26 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
+function inputProps(
+  colors: ReturnType<typeof useTheme>["colors"],
+  value: string,
+  onChangeText: (value: string) => void,
+  placeholder: string,
+) {
+  return {
+    value,
+    onChangeText,
+    placeholder,
+    placeholderTextColor: colors.textMuted,
+    style: {
+      backgroundColor: colors.inputBg,
+      borderColor: colors.inputBorder,
+      color: colors.text,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+    },
+  };
+}

@@ -1,0 +1,53 @@
+
+> frontend-native@1.0.0 lint
+> expo lint
+
+
+C:\Users\kevin\Desktop\kevin\Tolotra_app\frontend-native\app\(protected)\dashboard.tsx
+    3:3   warning  'ActivityIndicator' is defined but never used                    @typescript-eslint/no-unused-vars
+    5:3   warning  'Image' is defined but never used                                @typescript-eslint/no-unused-vars
+   26:11  warning  'colors' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+   30:10  warning  'products' is assigned a value but never used                    @typescript-eslint/no-unused-vars
+   32:10  warning  'loading' is assigned a value but never used                     @typescript-eslint/no-unused-vars
+  399:60  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  406:56  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  408:53  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  445:75  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\kevin\Desktop\kevin\Tolotra_app\frontend-native\app\(protected)\inventory\[id].tsx
+    4:3   warning  'Alert' is defined but never used                                @typescript-eslint/no-unused-vars
+   21:9   warning  'width' is assigned a value but never used                       @typescript-eslint/no-unused-vars
+   27:11  warning  'colors' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+   40:16  warning  'error' is defined but never used                                @typescript-eslint/no-unused-vars
+   76:20  warning  '_' is defined but never used                                    @typescript-eslint/no-unused-vars
+   88:18  warning  '_' is defined but never used                                    @typescript-eslint/no-unused-vars
+  348:28  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  348:40  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  348:52  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  352:65  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  417:63  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\kevin\Desktop\kevin\Tolotra_app\frontend-native\app\(protected)\inventory\create.tsx
+  2:10  warning  'View' is defined but never used   @typescript-eslint/no-unused-vars
+  2:47  warning  'Alert' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\kevin\Desktop\kevin\Tolotra_app\frontend-native\app\(protected)\inventory\index.tsx
+  20:11  warning  'colors' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\kevin\Desktop\kevin\Tolotra_app\frontend-native\app\(protected)\scanner.tsx
+   24:10  warning  'inventoryService' is defined but never used                     @typescript-eslint/no-unused-vars
+   26:9   warning  'width' is assigned a value but never used                       @typescript-eslint/no-unused-vars
+   30:11  warning  'colors' is assigned a value but never used                      @typescript-eslint/no-unused-vars
+   36:18  warning  'setReason' is assigned a value but never used                   @typescript-eslint/no-unused-vars
+   68:14  warning  '_' is defined but never used                                    @typescript-eslint/no-unused-vars
+   75:14  warning  '_' is defined but never used                                    @typescript-eslint/no-unused-vars
+   93:16  warning  '_' is defined but never used                                    @typescript-eslint/no-unused-vars
+  103:14  warning  'error' is defined but never used                                @typescript-eslint/no-unused-vars
+  223:60  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\kevin\Desktop\kevin\Tolotra_app\frontend-native\components\inventory\ProductList.tsx
+  14:29  warning  'SectorType' is defined but never used       @typescript-eslint/no-unused-vars
+  31:11  warning  'colors' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 34 problems (10 errors, 24 warnings)
+

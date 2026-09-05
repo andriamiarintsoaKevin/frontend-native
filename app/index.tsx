@@ -1,4 +1,5 @@
 import Button from "@/components/button";
+import ErrorNotice from "@/components/errorNotice";
 import Header from "@/components/header";
 import Input from "@/components/input";
 import LanguageToggle from "@/components/languageToggle";
@@ -9,17 +10,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Link, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -166,25 +166,13 @@ export default function Index() {
                 disabled={isLoading}
               />
               {visibleError && error ? (
-                <View
-                  style={[styles.snackbar, { backgroundColor: colors.surface }]}
-                >
-                  <Text style={[styles.snackbarText, { color: colors.text }]}>
-                    {error}
-                  </Text>
-                  <Pressable
-                    onPress={() => {
-                      setVisibleError(false);
-                      clearError();
-                    }}
-                  >
-                    <Text
-                      style={[styles.snackbarAction, { color: colors.primary }]}
-                    >
-                      {t("common.close")}
-                    </Text>
-                  </Pressable>
-                </View>
+                <ErrorNotice
+                  message={error}
+                  onDismiss={() => {
+                    setVisibleError(false);
+                    clearError();
+                  }}
+                />
               ) : null}
               {isLoading ? (
                 <View style={styles.loaderContainer}>
@@ -303,24 +291,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 12,
-  },
-  snackbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 12,
-  },
-  snackbarText: {
-    flex: 1,
-    fontSize: 13,
-  },
-  snackbarAction: {
-    fontSize: 13,
-    fontWeight: "600",
   },
   loaderContainer: {
     alignItems: "center",

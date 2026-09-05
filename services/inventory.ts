@@ -1,4 +1,4 @@
-import { Category, Product } from "../types";
+import { Category, DashboardMetrics, Product } from "../types";
 import api from "./api";
 
 const productsPrefix = "/v1/products";
@@ -6,19 +6,37 @@ const categoriesPrefix = "/v1/categories";
 
 export const inventoryService = {
   // Products
-  getProducts: async (): Promise<Product[]> => {
-    const response = await api.get(`${productsPrefix}/`);
+  getProducts: async (params?: {
+    sector?: string;
+    search?: string;
+    low_stock?: boolean;
+    skip?: number;
+    limit?: number;
+  }): Promise<Product[]> => {
+    const response = await api.get(`${productsPrefix}/`, { params });
     if (Array.isArray(response.data)) {
       return response.data;
     }
     return response.data?.items || response.data?.data || [];
   },
+
+  getDashboardStats: async (): Promise<DashboardMetrics> => {
+    const response = await api.get(`${productsPrefix}/dashboard/stats`);
+    return response.data;
+  },
+
+  scanProduct: async (code: string): Promise<Product> => {
+    const response = await api.get(`${productsPrefix}/scan/${encodeURIComponent(code)}`);
+    return response.data;
+  },
+
   getProduct: async (id: number): Promise<Product> => {
     const response = await api.get(`${productsPrefix}/${id}`);
     return response.data;
   },
+
   createProduct: async (
-    product: Omit<Product, "id" | "category" | "created_at">,
+    product: Partial<Product>,
   ): Promise<Product> => {
     const response = await api.post(`${productsPrefix}/`, product);
     return response.data;

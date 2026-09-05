@@ -3,6 +3,8 @@ export interface Category {
   name: string;
 }
 
+export type SectorType = "general" | "medical" | "it";
+
 export interface Product {
   id: number;
   name: string;
@@ -12,6 +14,38 @@ export interface Product {
   category_id: number;
   created_at?: string;
   category?: Category;
+
+  // Spécificités sectorielles et logistiques
+  sku?: string | null;
+  sector?: SectorType;
+  reorder_threshold?: number;
+  warehouse_location?: string | null;
+
+  // Médical / Pharma
+  batch_number?: string | null;
+  expiry_date?: string | null;
+  storage_temperature?: number | null;
+  is_expired?: boolean;
+
+  // IT & Matériel
+  serial_number?: string | null;
+  hardware_condition?: string | null;
+  assigned_to?: string | null;
+}
+
+export interface DashboardMetrics {
+  total_units: number;
+  active_references: number;
+  critical_stock_count: number;
+  expiring_soon_count: number;
+  expired_count: number;
+  turnover_rate: number | null;
+  cold_chain: {
+    status: string;
+    current_temp: number | null;
+    target_range: string | null;
+    hub: string | null;
+  };
 }
 
 export type MovementType = "IN" | "OUT";
@@ -31,3 +65,4 @@ export interface StockMovementCreate {
   movement_type: MovementType;
   reason?: string | null;
 }
+
